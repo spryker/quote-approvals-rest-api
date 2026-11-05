@@ -1,0 +1,99 @@
+resource:
+    name: QuoteApprovers
+    shortName: quote-approvers
+    description: 'Company users who may approve the cart of the authenticated company user'
+
+    paginationEnabled: false
+
+    security: "is_granted('ROLE_CUSTOMER') and (not is_granted('ROLE_AGENTIC_COMMERCE') or is_granted('ROLE_SCOPE_CART_READ'))"
+
+    operations:
+        # Not servable: API Platform needs an item operation to mint the IRI (`id` / `links.self`) of
+        # every approver in the collection, and without one it registers a public
+        # `/quote-approvers/{companyUserUuid}` route of its own. This anchor keeps the IRI under the
+        # cart while `NotFoundAction` + `openapi: false` keep it unreachable and unadvertised, and
+        # `internal: true` states that intent for the contract coverage gate.
+        - type: Get
+          description: 'Internal IRI anchor for quote approvers; not a reachable endpoint.'
+          uriTemplate: '/carts/{cartUuid}/quote-approvers/{companyUserUuid}'
+          controller: ApiPlatform\Symfony\Action\NotFoundAction
+          internal: true
+          read: false
+          output: false
+          openapi: false
+          uriVariables:
+              cartUuid:
+                  toProperty: 'cart'
+                  fromClass: CartsStorefrontResource
+              companyUserUuid:
+                  fromClass: QuoteApproversStorefrontResource
+
+        - type: GetCollection
+          uriTemplate: '/carts/{cartUuid}/quote-approvers'
+          description: 'List possible approvers of a cart'
+          provider: Spryker\Glue\QuoteApprovalsRestApi\Api\Storefront\Provider\QuoteApproversStorefrontProvider
+          uriVariables:
+              cartUuid:
+                  fromClass: CartsStorefrontResource
+          openapiContext:
+              responses:
+                  200:
+                      description: 'Approvers of the cart.'
+                  401:
+                      description: 'Invalid access token.'
+                  403:
+                      description: 'Missing access token, not a company user (code 1403), or a delegated token without cart:read.'
+                      codes:
+                          - code: '002'
+                            description: 'Missing access token.'
+                          - code: '1403'
+                            description: 'The caller is not a company user.'
+                  404:
+                      description: 'Cart not found (code 101).'
+                      codes:
+                          - code: '101'
+                            description: 'The cart does not exist or does not belong to the caller.'
+
+    properties:
+        companyUserUuid:
+            type: string
+            identifier: true
+            writable: false
+            readable: true
+            description: 'Uuid of the company user who may approve the cart'
+            openapiContext:
+                example: '4c677a6b-2f65-5645-9bf8-0ef3532bead1'
+
+        firstName:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'First name of the approver'
+            openapiContext:
+                example: 'Ben'
+
+        lastName:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'Last name of the approver'
+            openapiContext:
+                example: 'Becker'
+
+        companyBusinessUnitName:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'Name of the business unit of the approver'
+            openapiContext:
+                example: 'Purchasing'
+
+        cart:
+            type: CartsStorefrontResource
+            writable: false
+            readable: false
+            required: false
+            description: 'The cart the approvers are listed for'

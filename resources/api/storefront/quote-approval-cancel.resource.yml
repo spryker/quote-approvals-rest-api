@@ -1,0 +1,77 @@
+resource:
+    name: QuoteApprovalCancel
+    shortName: quote-approval-cancel
+    description: 'Cancel a pending approval request of a cart'
+
+    paginationEnabled: false
+
+    errorMappings:
+        - source: 'Spryker\Glue\QuoteApprovalsRestApi\QuoteApprovalsRestApiConfig::getErrorIdentifierToRestErrorMapping'
+
+    operations:
+        # Not servable: API Platform registers a public `/quote-approval-cancels/{quoteApprovalUuid}`
+        # item route for a resource that declares only a `Post`. This anchor replaces it, while
+        # `NotFoundAction` + `openapi: false` keep it unreachable and unadvertised, and
+        # `internal: true` states that intent for the contract coverage gate.
+        - type: Get
+          description: 'Internal item anchor for the cancellation of quote approvals; not a reachable endpoint.'
+          uriTemplate: '/carts/{cartUuid}/quote-approvals/{quoteApprovalUuid}/cancel'
+          controller: ApiPlatform\Symfony\Action\NotFoundAction
+          internal: true
+          read: false
+          output: false
+          openapi: false
+          uriVariables:
+              cartUuid:
+                  toProperty: 'cart'
+                  fromClass: CartsStorefrontResource
+              quoteApprovalUuid:
+                  fromClass: QuoteApprovalsStorefrontResource
+
+        - type: Post
+          uriTemplate: '/carts/{cartUuid}/quote-approvals/{quoteApprovalUuid}/cancel'
+          description: 'Cancel the pending approval request of a cart; the cart is unlocked and the approval is removed'
+          security: "is_granted('ROLE_CUSTOMER') and (not is_granted('ROLE_AGENTIC_COMMERCE') or is_granted('ROLE_SCOPE_CART_WRITE'))"
+          processor: Spryker\Glue\QuoteApprovalsRestApi\Api\Storefront\Processor\QuoteApprovalCancelStorefrontProcessor
+          deserialize: false
+          read: false
+          output: false
+          status: 204
+          uriVariables:
+              cartUuid:
+                  toProperty: 'cart'
+                  fromClass: CartsStorefrontResource
+              quoteApprovalUuid:
+                  fromClass: QuoteApprovalsStorefrontResource
+          openapiContext:
+              responses:
+                  204:
+                      description: 'Approval request cancelled; the cart is unlocked.'
+                  401:
+                      description: 'Invalid access token.'
+                  403:
+                      description: "Missing access token, not a company user (code 1403), a cart that is not the caller's own (code 5756), or a delegated token without cart:write."
+                      codes:
+                          - code: '002'
+                            description: 'Missing access token.'
+                          - code: '1403'
+                            description: 'The caller is not a company user.'
+                          - code: '5756'
+                            description: 'Only the requester of the approval can cancel it.'
+                  404:
+                      description: 'Cart not found (code 101), or the approval is not one of the cart (code 5755).'
+                      codes:
+                          - code: '101'
+                            description: 'The cart does not exist, or neither belongs to nor is shared with the caller.'
+                          - code: '5755'
+                            description: 'The cart has no approval with the given uuid.'
+
+    properties:
+        quoteApprovalUuid:
+            type: string
+            identifier: true
+            writable: false
+            readable: false
+            description: 'Uuid of the approval request to cancel'
+            openapiContext:
+                example: '8a1f3c2e-6b4d-5e7f-9a0b-1c2d3e4f5a6b'

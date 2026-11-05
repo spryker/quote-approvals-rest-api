@@ -1,0 +1,352 @@
+resource:
+    name: QuoteApprovals
+    shortName: quote-approvals
+    description: 'Approval requests of a cart of the authenticated company user'
+
+    paginationEnabled: false
+
+    errorMappings:
+        - source: 'Spryker\Glue\QuoteApprovalsRestApi\QuoteApprovalsRestApiConfig::getErrorIdentifierToRestErrorMapping'
+
+    operations:
+        # Not servable: API Platform needs an item operation to mint the IRI (`id` / `links.self`) of
+        # every approval, and without one it registers a public `/quote-approvals/{quoteApprovalUuid}`
+        # route of its own. This anchor keeps the IRI under the cart while `NotFoundAction` +
+        # `openapi: false` keep it unreachable and unadvertised, and `internal: true` states that
+        # intent for the contract coverage gate.
+        - type: Get
+          description: 'Internal IRI anchor for quote approvals; not a reachable endpoint.'
+          uriTemplate: '/carts/{cartUuid}/quote-approvals/{quoteApprovalUuid}'
+          controller: ApiPlatform\Symfony\Action\NotFoundAction
+          internal: true
+          read: false
+          output: false
+          openapi: false
+          uriVariables:
+              cartUuid:
+                  toProperty: 'cart'
+                  fromClass: CartsStorefrontResource
+              quoteApprovalUuid:
+                  fromClass: QuoteApprovalsStorefrontResource
+
+        - type: Post
+          uriTemplate: '/carts/{cartUuid}/quote-approvals'
+          description: 'Send a cart for approval to an approver of the business unit'
+          security: "is_granted('ROLE_CUSTOMER') and (not is_granted('ROLE_AGENTIC_COMMERCE') or is_granted('ROLE_SCOPE_CART_WRITE'))"
+          processor: Spryker\Glue\QuoteApprovalsRestApi\Api\Storefront\Processor\QuoteApprovalsStorefrontProcessor
+          uriVariables:
+              cartUuid:
+                  toProperty: 'cart'
+                  fromClass: CartsStorefrontResource
+          openapiContext:
+              responses:
+                  201:
+                      description: 'Approval requested; the cart is locked until the approval is cancelled or declined.'
+                  401:
+                      description: 'Invalid access token.'
+                  403:
+                      description: 'Missing access token, not a company user (code 1403), no permission to request approval (code 5751), a cart shared with the caller (code 5756), or a delegated token without cart:write.'
+                      codes:
+                          - code: '002'
+                            description: 'Missing access token.'
+                          - code: '1403'
+                            description: 'The caller is not a company user.'
+                          - code: '5751'
+                            description: 'The company user is not allowed to request approval of a cart.'
+                          - code: '5756'
+                            description: 'Only the owner of the cart can send it for approval.'
+                  404:
+                      description: 'Cart not found (code 101).'
+                      codes:
+                          - code: '101'
+                            description: 'The cart does not exist, or neither belongs to nor is shared with the caller.'
+                  422:
+                      description: 'The approver may not approve the cart (code 5752), approval is already requested or given (code 5753), the cart is empty or lacks checkout data (code 5754), or the request failed validation (code 901).'
+                      codes:
+                          - code: '5752'
+                            description: 'The approver is not allowed to approve this cart.'
+                          - code: '5753'
+                            description: 'The cart is already waiting for approval or approved.'
+                          - code: '5754'
+                            description: 'The cart cannot be sent for approval: it is empty or lacks a billing address, a payment or a shipment.'
+                          - code: '901'
+                            description: 'Request validation failed.'
+
+        - type: GetCollection
+          uriTemplate: '/carts/{cartUuid}/quote-approvals'
+          description: 'List the approval requests of a cart and its approval status'
+          security: "is_granted('ROLE_CUSTOMER') and (not is_granted('ROLE_AGENTIC_COMMERCE') or is_granted('ROLE_SCOPE_CART_READ'))"
+          provider: Spryker\Glue\QuoteApprovalsRestApi\Api\Storefront\Provider\QuoteApprovalsStorefrontProvider
+          uriVariables:
+              cartUuid:
+                  fromClass: CartsStorefrontResource
+          openapiContext:
+              responses:
+                  200:
+                      description: 'Approval requests of the cart; `meta.cartApprovalStatus` holds the approval status of the cart (`waiting`, `approved`, `declined`), or null when approval was never requested or is cancelled.'
+                  401:
+                      description: 'Invalid access token.'
+                  403:
+                      description: 'Missing access token, not a company user (code 1403), or a delegated token without cart:read.'
+                      codes:
+                          - code: '002'
+                            description: 'Missing access token.'
+                          - code: '1403'
+                            description: 'The caller is not a company user.'
+                  404:
+                      description: 'Cart not found (code 101).'
+                      codes:
+                          - code: '101'
+                            description: 'The cart does not exist or does not belong to the caller.'
+
+    properties:
+        quoteApprovalUuid:
+            type: string
+            identifier: true
+            writable: false
+            readable: true
+            description: 'Uuid of the approval request'
+            openapiContext:
+                example: '8a1f3c2e-6b4d-5e7f-9a0b-1c2d3e4f5a6b'
+
+        status:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'Status of the approval request: waiting, approved or declined'
+            openapiContext:
+                example: 'waiting'
+                enum: ['waiting', 'approved', 'declined']
+
+        approverCompanyUserUuid:
+            type: string
+            writable: true
+            readable: true
+            required: false
+            description: "Uuid of the company user asked to approve the cart, one of the cart's quote-approvers"
+            openapiContext:
+                example: '4c677a6b-2f65-5645-9bf8-0ef3532bead1'
+
+        approverName:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'First and last name of the approver'
+            openapiContext:
+                example: 'Ben Becker'
+
+        createdAt:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'When the approval was requested'
+            openapiContext:
+                example: '2026-10-23 09:15:00.000000'
+
+        updatedAt:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'When the approval request last changed'
+            openapiContext:
+                example: '2026-10-23 09:15:00.000000'
+
+        billingAddress:
+            type: object
+            objectName: Address
+            synthesizeMissingFieldsWhenEmpty: true
+            nullable: true
+            writable: true
+            readable: false
+            required: false
+            description: 'Billing address applied to the cart before the request, as the checkout resource takes it.'
+            properties:
+                id:
+                    type: string
+                    description: 'Identifier of an existing customer address to reuse; when set the other fields may be omitted.'
+                    openapiContext:
+                        example: '1a2b3c'
+                idCompanyBusinessUnitAddress:
+                    type: string
+                    description: 'Identifier of a company business unit address to reuse; when set the other fields may be omitted.'
+                    openapiContext:
+                        example: '1a2b3c'
+                salutation:
+                    type: string
+                    description: 'Address salutation.'
+                    openapiContext:
+                        example: 'Mr'
+                firstName:
+                    type: string
+                    description: 'Address first name.'
+                    openapiContext:
+                        example: 'John'
+                lastName:
+                    type: string
+                    description: 'Address last name.'
+                    openapiContext:
+                        example: 'Doe'
+                address1:
+                    type: string
+                    description: 'Street name.'
+                    openapiContext:
+                        example: 'Main Street'
+                address2:
+                    type: string
+                    description: 'House number.'
+                    openapiContext:
+                        example: '1'
+                address3:
+                    type: string
+                    description: 'Additional address line.'
+                    openapiContext:
+                        example: 'third. address. line'
+                zipCode:
+                    type: string
+                    description: 'ZIP code.'
+                    openapiContext:
+                        example: '10115'
+                city:
+                    type: string
+                    description: 'City.'
+                    openapiContext:
+                        example: 'Berlin'
+                iso2Code:
+                    type: string
+                    description: 'ISO 2 country code.'
+                    openapiContext:
+                        example: 'DE'
+                company:
+                    type: string
+                    description: 'Company name.'
+                    openapiContext:
+                        example: 'Spryker Systems GmbH'
+                phone:
+                    type: string
+                    description: 'Phone number.'
+                    openapiContext:
+                        example: '+49 30 123456'
+                email:
+                    type: string
+                    description: 'Email address.'
+                    openapiContext:
+                        example: 'john.doe@example.com'
+
+        shippingAddress:
+            type: object
+            objectName: Address
+            synthesizeMissingFieldsWhenEmpty: true
+            nullable: true
+            writable: true
+            readable: false
+            required: false
+            description: 'Shipping address applied to the cart before the request, as the checkout resource takes it.'
+            properties:
+                id:
+                    type: string
+                    description: 'Identifier of an existing customer address to reuse; when set the other fields may be omitted.'
+                    openapiContext:
+                        example: '1a2b3c'
+                idCompanyBusinessUnitAddress:
+                    type: string
+                    description: 'Identifier of a company business unit address to reuse; when set the other fields may be omitted.'
+                    openapiContext:
+                        example: '1a2b3c'
+                salutation:
+                    type: string
+                    description: 'Address salutation.'
+                    openapiContext:
+                        example: 'Mr'
+                firstName:
+                    type: string
+                    description: 'Address first name.'
+                    openapiContext:
+                        example: 'John'
+                lastName:
+                    type: string
+                    description: 'Address last name.'
+                    openapiContext:
+                        example: 'Doe'
+                address1:
+                    type: string
+                    description: 'Street name.'
+                    openapiContext:
+                        example: 'Main Street'
+                address2:
+                    type: string
+                    description: 'House number.'
+                    openapiContext:
+                        example: '1'
+                address3:
+                    type: string
+                    description: 'Additional address line.'
+                    openapiContext:
+                        example: 'third. address. line'
+                zipCode:
+                    type: string
+                    description: 'ZIP code.'
+                    openapiContext:
+                        example: '10115'
+                city:
+                    type: string
+                    description: 'City.'
+                    openapiContext:
+                        example: 'Berlin'
+                iso2Code:
+                    type: string
+                    description: 'ISO 2 country code.'
+                    openapiContext:
+                        example: 'DE'
+                company:
+                    type: string
+                    description: 'Company name.'
+                    openapiContext:
+                        example: 'Spryker Systems GmbH'
+                phone:
+                    type: string
+                    description: 'Phone number.'
+                    openapiContext:
+                        example: '+49 30 123456'
+                email:
+                    type: string
+                    description: 'Email address.'
+                    openapiContext:
+                        example: 'john.doe@example.com'
+
+        shipment:
+            type: object
+            objectName: CheckoutShipment
+            nullable: true
+            writable: true
+            readable: false
+            required: false
+            description: 'Shipment applied to the cart before the request, as the checkout resource takes it.'
+            properties:
+                idShipmentMethod:
+                    type: integer
+                    description: 'Shipment method identifier.'
+                    openapiContext:
+                        example: 1
+
+        payments:
+            type: array
+            nullable: true
+            writable: true
+            readable: false
+            required: false
+            description: 'Payment applied to the cart before the request, as the checkout resource takes it.'
+            openapiContext:
+                example:
+                    - paymentMethodName: 'invoice'
+                      paymentProviderName: 'DummyPayment'
+
+        cart:
+            type: CartsStorefrontResource
+            writable: false
+            readable: false
+            required: false
+            description: 'The cart the approval is requested for'

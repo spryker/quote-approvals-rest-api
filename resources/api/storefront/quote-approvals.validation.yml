@@ -1,0 +1,73 @@
+post:
+    approverCompanyUserUuid:
+        - NotBlank
+        - Uuid
+    billingAddress:
+        - Optional:
+              constraints:
+                  - Collection:
+                        allowExtraFields: true
+                        allowMissingFields: true
+                        fields:
+                            salutation:
+                                - NotBlank
+                            firstName:
+                                - NotBlank
+                            lastName:
+                                - NotBlank
+                            address1:
+                                - NotBlank
+                            address2:
+                                - NotBlank
+                            zipCode:
+                                - NotBlank
+                            city:
+                                - NotBlank
+                            iso2Code:
+                                - NotBlank
+    shippingAddress:
+        - Optional:
+              constraints:
+                  - Collection:
+                        allowExtraFields: true
+                        allowMissingFields: true
+                        fields:
+                            salutation:
+                                - NotBlank
+                            firstName:
+                                - NotBlank
+                            lastName:
+                                - NotBlank
+                            address1:
+                                - NotBlank
+                            address2:
+                                - NotBlank
+                            zipCode:
+                                - NotBlank
+                            city:
+                                - NotBlank
+                            iso2Code:
+                                - NotBlank
+    payments:
+        - Optional:
+              constraints:
+                  - All:
+                        constraints:
+                            - Collection:
+                                  allowExtraFields: true
+                                  fields:
+                                      paymentMethodName:
+                                          - NotBlank
+                                      paymentProviderName:
+                                          - NotBlank
+    shipment:
+        - Optional:
+              constraints:
+                  - Collection:
+                        allowExtraFields: true
+                        fields:
+                            idShipmentMethod:
+                                - NotNull:
+                                      message: 'This field is missing.'
+                                - Type:
+                                      type: numeric
